@@ -1,0 +1,242 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');* {
+  box-sizing: border-box;
+}
+body {
+  font-family: 'Roboto', sans-serif;
+  padding: 20px;
+  margin: 0;
+  background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+h2, h3 {
+  color: #333;
+  text-align: center;
+}
+.controls, #eventsContainer {
+  width: 100%;
+  max-width: 600px;
+}
+.event {
+  background: #fff;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 15px;
+}
+label {
+  display: block;
+  margin-top: 10px;
+}
+input, select, button {
+  margin-top: 5px;
+  padding: 10px;
+  width: 100%;
+  font-size: 1rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: 'Roboto', sans-serif;
+}
+button {
+  border: none;
+  background: #007bff;
+  color: white;
+  cursor: pointer;
+  margin-top: 10px;
+}
+button.delete {
+  background: #dc3545;
+}
+button.edit {
+  background: #ffc107;
+  color: #000;
+}
+button.back {
+  background: #6c757d;
+}
+.hidden {
+  display: none;
+}
+.progress-bar {
+  height: 10px;
+  background: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.progress-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745, #8bc34a);
+  transition: width 1s linear;
+}
+.event-buttons {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+.time-label {
+  margin-top: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2c3e50;
+}
+@media (max-width: 480px) {
+  input, button {
+    font-size: 0.95rem;
+  }
+  .event-buttons {
+    flex-direction: column;
+  }
+}
+
+  </style>
+</head>
+<body>
+  <div class="controls" id="initialChoice">
+    <h2>Track an Event</h2>
+    <button onclick="chooseEventType('future')">Future Event</button>
+    <button onclick="chooseEventType('past')">Historical Event</button>
+  </div>  <div class="controls hidden" id="eventForm">
+    <h3>Create <span id="eventTypeLabel"></span> Event</h3>
+    <label>Event Name: <input type="text" id="eventName"></label>
+    <label>Date: <input type="date" id="eventDate"></label>
+    <label>Time (optional): <input type="time" id="eventTime"></label>
+    <button onclick="saveEvent()">Save Event</button>
+    <button class="back" onclick="goBack()">Back</button>
+  </div>  <h2>My Events</h2>
+  <div id="eventsContainer"></div>  <script>
+    let currentEventType = '', editIndex = null;
+
+    function chooseEventType(type) {
+      currentEventType = type;
+      document.getElementById("initialChoice").classList.add("hidden");
+      document.getElementById("eventForm").classList.remove("hidden");
+      document.getElementById("eventTypeLabel").textContent = type === 'future' ? 'Future' : 'Historical';
+    }
+
+    function goBack() {
+      document.getElementById("initialChoice").classList.remove("hidden");
+      document.getElementById("eventForm").classList.add("hidden");
+      document.getElementById("eventName").value = '';
+      document.getElementById("eventDate").value = '';
+      document.getElementById("eventTime").value = '';
+      editIndex = null;
+    }
+
+    function saveEvent() {
+      const name = document.getElementById("eventName").value.trim();
+      const date = document.getElementById("eventDate").value;
+      const time = document.getElementById("eventTime").value || "00:00";
+
+      if (!name || !date) return alert("Please enter event name and date.");
+      const fullDate = new Date(`${date}T${time}`);
+
+      const event = {
+        name,
+        timestamp: fullDate.getTime(),
+        type: currentEventType,
+        hasDate: date,
+        hasTime: !!document.getElementById("eventTime").value
+      };
+
+      let events = JSON.parse(localStorage.getItem("events") || "[]");
+
+      if (editIndex !== null) {
+        events[editIndex] = event;
+        editIndex = null;
+      } else {
+        events.push(event);
+      }
+
+      localStorage.setItem("events", JSON.stringify(events));
+      location.reload();
+    }
+
+    function renderEvents() {
+      const container = document.getElementById("eventsContainer");
+      container.innerHTML = "";
+      const events = JSON.parse(localStorage.getItem("events") || "[]");
+
+      events.forEach((event, index) => {
+        const now = Date.now();
+        const diff = event.type === 'future' ? event.timestamp - now : now - event.timestamp;
+
+        let remaining = Math.floor(diff / 1000);
+        const years = Math.floor(remaining / (365 * 24 * 3600));
+        remaining %= (365 * 24 * 3600);
+        const months = Math.floor(remaining / (30 * 24 * 3600));
+        remaining %= (30 * 24 * 3600);
+        const days = Math.floor(remaining / (24 * 3600));
+        remaining %= (24 * 3600);
+        const hours = Math.floor(remaining / 3600);
+        remaining %= 3600;
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+
+        let timeStr = event.type === 'future' ? "in " : "since ";
+        const parts = [];
+        if (event.hasDate) {
+          if (years) parts.push(`${years} year${years > 1 ? 's' : ''}`);
+          if (years || months) parts.push(`${months} month${months > 1 ? 's' : ''}`);
+          if (years || months || days) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+        }
+        if (event.hasTime || (!years && !months && !days)) {
+          parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+          parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+          parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+        }
+
+        const fullTimeStr = timeStr + parts.join(', ');
+
+        const div = document.createElement("div");
+        div.className = "event";
+        div.innerHTML = `
+          <strong>${event.name}</strong><br>
+          <div class="time-label">${event.type === 'future' && diff < 0 ? "<em>Event Passed!</em>" : ""}
+          ${event.type === 'past' && diff < 0 ? "<em>Invalid Past Date</em>" : fullTimeStr}</div>
+          <div class="progress-bar"><div style="width:${Math.min(Math.max((event.type === 'future' ? 1 - (event.timestamp - now) / (365 * 24 * 3600 * 1000) : (now - event.timestamp) / (365 * 24 * 3600 * 1000)) * 100, 0), 100)}%"></div></div>
+          <div class="event-buttons">
+            <button class="edit" onclick="editEvent(${index})">Edit</button>
+            <button class="delete" onclick="deleteEvent(${index})">Delete</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteEvent(index) {
+      if (!confirm("Are you sure you want to delete this event?")) return;
+      let events = JSON.parse(localStorage.getItem("events") || "[]");
+      events.splice(index, 1);
+      localStorage.setItem("events", JSON.stringify(events));
+      renderEvents();
+    }
+
+    function editEvent(index) {
+      let events = JSON.parse(localStorage.getItem("events") || "[]");
+      const event = events[index];
+      const dateObj = new Date(event.timestamp);
+
+      document.getElementById("eventName").value = event.name;
+      document.getElementById("eventDate").value = dateObj.toISOString().slice(0, 10);
+      document.getElementById("eventTime").value = dateObj.toTimeString().slice(0, 5);
+      currentEventType = event.type;
+      editIndex = index;
+
+      document.getElementById("initialChoice").classList.add("hidden");
+      document.getElementById("eventForm").classList.remove("hidden");
+      document.getElementById("eventTypeLabel").textContent = currentEventType === 'future' ? 'Future' : 'Historical';
+    }
+
+    setInterval(renderEvents, 1000);
+    renderEvents();
+  </script></body>
+</html>
